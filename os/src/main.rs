@@ -87,6 +87,7 @@ pub fn rust_main() -> ! {
         boot_stack_top as usize, boot_stack_lower_bound as usize
     );
     error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
+    error!("wtf");
     trap::init();
     batch::init();
     batch::run_next_app();
