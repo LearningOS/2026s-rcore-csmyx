@@ -14,9 +14,12 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use core::array;
+
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::syscall::SYSCALL_IDS;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -51,9 +54,11 @@ lazy_static! {
     /// Global variable: TASK_MANAGER
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
+        let syscall_counter = array::from_fn(|id| (SYSCALL_IDS[id], 0));
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_counter,
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -135,6 +140,43 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Get the calling count of invoking the given syscall by current task.
+    fn get_cur_syscall_counter(&self, syscall_id: usize) -> Option<usize> {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let syscall_counter = &inner.tasks[current].syscall_counter;
+        syscall_counter
+            .iter()
+            // .inspect(|x| trace!("{:?}", x))
+            .find_map(|&(id, cnt)| (id == syscall_id).then_some(cnt))
+    }
+
+    /// Increment the count of invoking the given syscall by current task.
+    fn inc_cur_syscall_counter(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let syscall_counter = &mut inner.tasks[current].syscall_counter;
+        if let Some((_, cnt)) = syscall_counter
+            .iter_mut()
+            .find(|&&mut (id, _)| id == syscall_id)
+        {
+            *cnt += 1;
+            // trace!("inc_cur_syscall_count id: {syscall_id} cnt: {}", *cnt);
+        }
+    }
+}
+
+/// Get the calling count of invoking the given syscall by current task.
+pub fn get_cur_syscall_count(syscall_id: usize) -> usize {
+    TASK_MANAGER
+        .get_cur_syscall_counter(syscall_id)
+        .unwrap_or(0)
+}
+
+/// Increment the count of invoking the given syscall by current task.
+pub fn inc_cur_syscall_count(syscall_id: usize) {
+    TASK_MANAGER.inc_cur_syscall_counter(syscall_id)
 }
 
 /// Run the first task in task list.
