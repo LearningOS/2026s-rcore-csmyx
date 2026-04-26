@@ -49,18 +49,22 @@ impl TaskControlBlock {
         end_va: usize,
         permission: usize,
     ) -> bool {
-        // NOTE: the bits pattern of permission is different from the pattern of MapPermission,
-        // so we need to shift left to align to it.
-        let permission = permission << 1;
-        let valid_bits = (MapPermission::R | MapPermission::W | MapPermission::X).bits() as usize;
-        if (permission & !valid_bits) != 0 || permission & valid_bits == 0 {
+        if permission >> 3 != 0 {
             return false;
         }
-        self.memory_set.try_insert_framed_area(
-            start_va.into(),
-            end_va.into(),
-            MapPermission::from_bits(permission as u8).unwrap(),
-        )
+        let mut perm = MapPermission::U;
+        if permission & 0x1 != 0 {
+            perm |= MapPermission::R;
+        }
+        if permission & 0x2 != 0 {
+            perm |= MapPermission::W;
+        }
+        if permission & 0x4 != 0 {
+            perm |= MapPermission::X;
+        }
+
+        self.memory_set
+            .try_insert_framed_area(start_va.into(), end_va.into(), perm)
     }
     /// Translate virtual address to physical address by current memory set.
     /// return None if is not page aligned or the mapping is not valid
