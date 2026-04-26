@@ -194,7 +194,7 @@ impl TaskManager {
             info!("inc_id: {:?}, cnt: {}", id, *cnt);
         }
     }
-    /// todo
+    /// Insert a map area to current task's page table.
     fn cur_addr_insert_framed_area(
         &self,
         start_va: usize,
@@ -205,7 +205,7 @@ impl TaskManager {
         let cur = inner.current_task;
         inner.tasks[cur].user_addr_insert_framed_area(start_va, end_va, permission)
     }
-    /// todo
+    /// Remove a map area from current task's page table.
     fn cur_addr_remove_framed_area(&self, start_va: usize, end_va: usize) -> bool {
         let mut inner = self.inner.exclusive_access();
         let cur = inner.current_task;
@@ -213,12 +213,12 @@ impl TaskManager {
     }
 }
 
-/// todo
+/// Insert a map area to current task's page table.
 pub fn add_address_mapping(start_va: usize, end_va: usize, permission: usize) -> bool {
     TASK_MANAGER.cur_addr_insert_framed_area(start_va, end_va, permission)
 }
 
-/// todo
+/// Remove a map area from current task's page table.
 pub fn remove_address_mapping(start_va: usize, end_va: usize) -> bool {
     TASK_MANAGER.cur_addr_remove_framed_area(start_va, end_va)
 }

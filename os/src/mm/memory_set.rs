@@ -64,7 +64,8 @@ impl MemorySet {
             None,
         )
     }
-    /// todo doc
+    /// Remove framed area mapping.
+    /// Retrun false if the mapping is not valid.
     pub fn try_remove_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
         if !start_va.aligned() {
             return false;
@@ -72,7 +73,8 @@ impl MemorySet {
         self.try_pop(MapArea::new_without_perm(start_va, end_va, MapType::Framed))
     }
 
-    /// todo doc
+    /// Insert framed area mapping.
+    /// Retrun false if the mapping is not valid.
     pub fn try_insert_framed_area(
         &mut self,
         start_va: VirtAddr,
@@ -88,7 +90,7 @@ impl MemorySet {
         )
     }
     /// Retrun false if:
-    /// 1. there exists any page in the map_area which has been already mapped. or
+    /// 1. there exists any page in the map_area which had been already mapped. or
     /// 2. no available physical memory to allcate a new frame.
     fn try_push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> bool {
         if !map_area.try_map(&mut self.page_table) {
@@ -107,7 +109,8 @@ impl MemorySet {
         }
         self.areas.push(map_area);
     }
-    /// todo
+    /// Retrun false if:
+    /// there exists any page in the map_area which had not been mapped.
     fn try_pop(&mut self, mut map_area: MapArea) -> bool {
         map_area.try_unmap(&mut self.page_table)
     }

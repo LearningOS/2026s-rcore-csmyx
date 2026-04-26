@@ -109,7 +109,7 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(start: usize, len: usize) -> isize {
-    println!("harmony os kernel: sys_munmap");
+    trace!("kernel: sys_munmap");
     let start_va = start;
     let end_va = start + len;
     if remove_address_mapping(start_va, end_va) {
