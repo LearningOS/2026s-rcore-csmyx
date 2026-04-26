@@ -205,11 +205,22 @@ impl TaskManager {
         let cur = inner.current_task;
         inner.tasks[cur].user_addr_insert_framed_area(start_va, end_va, permission)
     }
+    /// todo
+    fn cur_addr_remove_framed_area(&self, start_va: usize, end_va: usize) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].user_addr_remove_framed_area(start_va, end_va)
+    }
 }
 
 /// todo
 pub fn add_address_mapping(start_va: usize, end_va: usize, permission: usize) -> bool {
     TASK_MANAGER.cur_addr_insert_framed_area(start_va, end_va, permission)
+}
+
+/// todo
+pub fn remove_address_mapping(start_va: usize, end_va: usize) -> bool {
+    TASK_MANAGER.cur_addr_remove_framed_area(start_va, end_va)
 }
 
 /// Get syscall counter

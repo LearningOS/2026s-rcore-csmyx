@@ -7,7 +7,7 @@ use crate::{
     task::{
         add_address_mapping, change_program_brk, cur_user_addr_translate,
         cur_user_addr_translate_page_align_checked, exit_current_and_run_next, get_syscall_counter,
-        suspend_current_and_run_next,
+        remove_address_mapping, suspend_current_and_run_next,
     },
     timer::get_time_us,
 };
@@ -97,7 +97,7 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_mmap");
     let start_va = start;
     let end_va = start + len;
     if add_address_mapping(start_va, end_va, port) {
@@ -108,9 +108,15 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    println!("harmony os kernel: sys_munmap");
+    let start_va = start;
+    let end_va = start + len;
+    if remove_address_mapping(start_va, end_va) {
+        0
+    } else {
+        -1
+    }
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

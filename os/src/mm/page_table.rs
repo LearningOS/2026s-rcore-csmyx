@@ -153,7 +153,8 @@ impl PageTable {
         }
         result
     }
-    /// todo doc
+    /// Insert the map between virtual page number and physical page number
+    /// return false if `vpn` had already been mapped.
     #[allow(unused)]
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) -> bool {
         let pte = self.find_pte_create(vpn).unwrap();
@@ -164,12 +165,17 @@ impl PageTable {
             false
         }
     }
-    /// remove the map between virtual page number and physical page number
+    /// Remove the map between virtual page number and physical page number
+    /// return false if `vpn` had not been mapped.
     #[allow(unused)]
-    pub fn unmap(&mut self, vpn: VirtPageNum) {
+    pub fn unmap(&mut self, vpn: VirtPageNum) -> bool {
         let pte = self.find_pte(vpn).unwrap();
-        assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
-        *pte = PageTableEntry::empty();
+        if pte.is_valid() {
+            *pte = PageTableEntry::empty();
+            true
+        } else {
+            false
+        }
     }
     /// get the page table entry from the virtual page number
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {

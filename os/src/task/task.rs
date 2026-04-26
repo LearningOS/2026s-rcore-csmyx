@@ -42,6 +42,11 @@ impl TaskControlBlock {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
     }
+    /// Remove a framed area from current task's page table.
+    pub fn user_addr_remove_framed_area(&mut self, start_va: usize, end_va: usize) -> bool {
+        self.memory_set
+            .try_remove_framed_area(start_va.into(), end_va.into())
+    }
     /// Insert a framed area into current task's page table.
     pub fn user_addr_insert_framed_area(
         &mut self,
