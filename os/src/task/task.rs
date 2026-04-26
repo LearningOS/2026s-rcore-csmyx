@@ -35,6 +35,18 @@ impl TaskControlBlock {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
     }
+    /// Translate virtual address to physical address by current memory set.
+    /// return None if is not page aligned or the mapping is not valid
+    pub fn get_user_addr_map_page_align_checked(&self, va: usize, len: usize) -> Option<usize> {
+        self.memory_set
+            .translate_addr_page_align_checked(va.into(), (va + len - 1).into())
+            .map(|pa| pa.0)
+    }
+    /// Translate virtual address to physical address by current memory set.
+    /// Return None if the mapping is not valid.
+    pub fn get_user_addr_map(&self, va: usize) -> Option<usize> {
+        self.memory_set.translate_addr(va.into()).map(|pa| pa.0)
+    }
     /// get the user token
     pub fn get_user_token(&self) -> usize {
         self.memory_set.token()

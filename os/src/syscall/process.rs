@@ -1,7 +1,13 @@
 //! Process management syscalls
-use crate::task::{
-    change_program_brk, exit_current_and_run_next, get_syscall_counter,
-    suspend_current_and_run_next,
+
+use core::mem::size_of;
+
+use crate::{
+    task::{
+        change_program_brk, exit_current_and_run_next, get_syscall_counter, get_user_addr_map,
+        get_user_addr_map_page_align_checked, suspend_current_and_run_next,
+    },
+    timer::get_time_us,
 };
 
 #[repr(C)]
@@ -28,18 +34,55 @@ pub fn sys_yield() -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let us = get_time_us();
+    let va = ts as *const _ as usize;
+    let len = size_of::<TimeVal>();
+    if let Some(pa) = get_user_addr_map_page_align_checked(va, len) {
+        let pa = pa as *mut _;
+        // Safety: We can directly dereference the user's physical address,
+        // bacause the user's address area is identically mapped in the kerenl's page table.
+        unsafe {
+            *pa = TimeVal {
+                sec: us / 1_000_000,
+                usec: us % 1_000_000,
+            };
+        }
+        0
+    } else {
+        -1
+    }
 }
 
 /// TODO: Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
-pub fn sys_trace(trace_request: usize, id: usize, _data: usize) -> isize {
+pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
     match trace_request {
-        0 => todo!(),
-        1 => todo!(),
+        0 => {
+            let va = id as *const u8 as usize;
+            if let Some(pa) = get_user_addr_map(va) {
+                let pa = pa as *const u8;
+                // Safety: We can directly dereference the user's physical address,
+                // bacause the user's address area is identically mapped in the kerenl's page table.
+                unsafe { *pa as isize }
+            } else {
+                -1
+            }
+        }
+        1 => {
+            let va = id as *const u8 as usize;
+            if let Some(pa) = get_user_addr_map(va) {
+                let pa = pa as *mut u8;
+                // Safety: We can directly dereference the user's physical address,
+                // bacause the user's address area is identically mapped in the kerenl's page table.
+                unsafe { *pa = data as u8 };
+                0
+            } else {
+                -1
+            }
+        }
         2 => {
             let syscall_id = id;
             get_syscall_counter(syscall_id) as isize

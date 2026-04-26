@@ -16,7 +16,7 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
-use crate::syscall::SYSCALL_IDS;
+use crate::syscall::{SyscallId, SYSCALL_IDS};
 use crate::trap::TrapContext;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -49,7 +49,7 @@ struct TaskManagerInner {
     /// id of current `Running` task
     current_task: usize,
     /// syscall counter, (syscall_id, count)
-    syscall_counter: Vec<(usize, usize)>,
+    syscall_counter: Vec<(SyscallId, usize)>,
 }
 
 lazy_static! {
@@ -123,6 +123,18 @@ impl TaskManager {
             .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
 
+    /// Translate virtual address to physical address.
+    /// Return None if the mapping is not valid.
+    fn get_current_addr_map_page_align_checked(&self, va: usize, len: usize) -> Option<usize> {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].get_user_addr_map_page_align_checked(va, len)
+    }
+    /// Translate virtual address to physical address.
+    /// Return None if the mapping is not valid.
+    fn get_current_addr_map(&self, va: usize) -> Option<usize> {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].get_user_addr_map(va)
+    }
     /// Get the current 'Running' task's token.
     fn get_current_token(&self) -> usize {
         let inner = self.inner.exclusive_access();
@@ -162,23 +174,24 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
-    /// Get syscall counter
-    fn get_syscall_counter(&self, syscall_id: SyscallId) -> Option<usize> {
+    /// Get syscall count
+    fn get_syscall_count(&self, syscall_id: SyscallId) -> Option<usize> {
         let inner = self.inner.exclusive_access();
         inner
             .syscall_counter
             .iter()
             .find_map(|&(id, cnt)| (id == syscall_id).then_some(cnt))
     }
-    /// Increment syscall counter
-    fn inc_syscall_counter(&self, syscall_id: SyscallId) {
+    /// Increment syscall count
+    fn inc_syscall_count(&self, syscall_id: SyscallId) {
         let mut inner = self.inner.exclusive_access();
-        if let Some((_id, cnt)) = inner
+        if let Some((id, cnt)) = inner
             .syscall_counter
             .iter_mut()
             .find(|&&mut (id, _cnt)| (id == syscall_id))
         {
             *cnt += 1;
+            info!("inc_id: {:?}, cnt: {}", id, *cnt);
         }
     }
 }
@@ -186,13 +199,13 @@ impl TaskManager {
 /// Get syscall counter
 pub fn get_syscall_counter(syscall_id: usize) -> usize {
     TASK_MANAGER
-        .get_syscall_counter(syscall_id.into())
+        .get_syscall_count(syscall_id.into())
         .unwrap_or(0)
 }
 
 /// Increment syscall counter
 pub fn inc_syscall_counter(syscall_id: usize) {
-    TASK_MANAGER.inc_syscall_counter(syscall_id.into())
+    TASK_MANAGER.inc_syscall_count(syscall_id.into())
 }
 
 /// Run the first task in task list.
@@ -231,6 +244,20 @@ pub fn exit_current_and_run_next() {
 /// Get the current 'Running' task's token.
 pub fn current_user_token() -> usize {
     TASK_MANAGER.get_current_token()
+}
+
+/// Translating the virtual address to physical address through the current task's page table.
+/// Return None if the mapping is not valid.
+pub fn get_user_addr_map(va: usize) -> Option<usize> {
+    TASK_MANAGER.get_current_addr_map(va)
+}
+
+/// Translating the virtual address to physical address through the current task's page table.
+/// Return None if:
+/// 1. the mapping is not valid, or
+/// 2. address area [va, va+len-1] is splitted by two pages
+pub fn get_user_addr_map_page_align_checked(va: usize, len: usize) -> Option<usize> {
+    TASK_MANAGER.get_current_addr_map_page_align_checked(va, len)
 }
 
 /// Get the current 'Running' task's trap contexts.

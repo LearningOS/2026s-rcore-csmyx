@@ -233,6 +233,28 @@ impl MemorySet {
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
     }
+    /// Translate a virtual address to a physical address
+    /// return None if is not page aligned or the mapping is not valid
+    pub fn translate_addr_page_align_checked(
+        &self,
+        va_head: VirtAddr,
+        va_tail: VirtAddr,
+    ) -> Option<PhysAddr> {
+        if va_head.floor() == va_tail.floor() {
+            let vpn: VirtPageNum = va_head.floor();
+            let ppn = self.page_table.translate(vpn)?.ppn();
+            Some(PhysAddr::from_ppn_and_offset(ppn, va_head.page_offset()))
+        } else {
+            None
+        }
+    }
+    /// Translate a virtual address to a physical address
+    /// return None if the mapping is not valid
+    pub fn translate_addr(&self, va: VirtAddr) -> Option<PhysAddr> {
+        let vpn: VirtPageNum = va.floor();
+        let ppn = self.page_table.translate(vpn)?.ppn();
+        Some(PhysAddr::from_ppn_and_offset(ppn, va.page_offset()))
+    }
     /// shrink the area to new_end
     #[allow(unused)]
     pub fn shrink_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
