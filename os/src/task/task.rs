@@ -54,17 +54,17 @@ impl TaskControlBlock {
         end_va: usize,
         permission: usize,
     ) -> bool {
-        if permission >> 3 != 0 {
+        if (permission & 0b111 == 0) || (permission >> 3 != 0) {
             return false;
         }
         let mut perm = MapPermission::U;
-        if permission & 0x1 != 0 {
+        if permission & 0b001 != 0 {
             perm |= MapPermission::R;
         }
-        if permission & 0x2 != 0 {
+        if permission & 0b010 != 0 {
             perm |= MapPermission::W;
         }
-        if permission & 0x4 != 0 {
+        if permission & 0b100 != 0 {
             perm |= MapPermission::X;
         }
 
