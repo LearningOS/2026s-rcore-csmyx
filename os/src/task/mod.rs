@@ -118,7 +118,7 @@ impl TaskManager {
 
     /// Translate virtual address to physical address.
     /// Return None if the mapping is not valid.
-    fn cur_user_addr_translate_page_align_checked(
+    fn cur_addr_translate_page_align_checked(
         &self,
         va: usize,
         len: usize,
@@ -129,7 +129,7 @@ impl TaskManager {
     }
     /// Translate virtual address to physical address.
     /// Return None if the mapping is not valid.
-    fn cur_user_addr_translate(&self, va: usize, flags: Option<PTEFlags>) -> Option<usize> {
+    fn cur_addr_translate(&self, va: usize, flags: Option<PTEFlags>) -> Option<usize> {
         let inner = self.inner.exclusive_access();
         inner.tasks[inner.current_task].user_addr_translate(va, flags)
     }
@@ -194,6 +194,22 @@ impl TaskManager {
             info!("inc_id: {:?}, cnt: {}", id, *cnt);
         }
     }
+    /// todo
+    fn cur_addr_insert_framed_area(
+        &self,
+        start_va: usize,
+        end_va: usize,
+        permission: usize,
+    ) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].user_addr_insert_framed_area(start_va, end_va, permission)
+    }
+}
+
+/// todo
+pub fn add_address_mapping(start_va: usize, end_va: usize, permission: usize) -> bool {
+    TASK_MANAGER.cur_addr_insert_framed_area(start_va, end_va, permission)
 }
 
 /// Get syscall counter
@@ -249,7 +265,7 @@ pub fn current_user_token() -> usize {
 /// Translating the virtual address to physical address through the current task's page table.
 /// Return None if the mapping is not valid.
 pub fn cur_user_addr_translate(va: usize, flags: Option<PTEFlags>) -> Option<usize> {
-    TASK_MANAGER.cur_user_addr_translate(va, flags)
+    TASK_MANAGER.cur_addr_translate(va, flags)
 }
 
 /// Translating the virtual address to physical address through the current task's page table.
@@ -261,7 +277,7 @@ pub fn cur_user_addr_translate_page_align_checked(
     len: usize,
     flags: Option<PTEFlags>,
 ) -> Option<usize> {
-    TASK_MANAGER.cur_user_addr_translate_page_align_checked(va, len, flags)
+    TASK_MANAGER.cur_addr_translate_page_align_checked(va, len, flags)
 }
 
 /// Get the current 'Running' task's trap contexts.

@@ -42,6 +42,26 @@ impl TaskControlBlock {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
     }
+    /// Insert a framed area into current task's page table.
+    pub fn user_addr_insert_framed_area(
+        &mut self,
+        start_va: usize,
+        end_va: usize,
+        permission: usize,
+    ) -> bool {
+        // NOTE: the bits pattern of permission is different from the pattern of MapPermission,
+        // so we need to shift left to align to it.
+        let permission = permission << 1;
+        let valid_bits = (MapPermission::R | MapPermission::W | MapPermission::X).bits() as usize;
+        if (permission & !valid_bits) != 0 || permission & valid_bits == 0 {
+            return false;
+        }
+        self.memory_set.try_insert_framed_area(
+            start_va.into(),
+            end_va.into(),
+            MapPermission::from_bits(permission as u8).unwrap(),
+        )
+    }
     /// Translate virtual address to physical address by current memory set.
     /// return None if is not page aligned or the mapping is not valid
     pub fn user_addr_translate_page_align_checked(

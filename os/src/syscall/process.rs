@@ -5,8 +5,9 @@ use core::mem::size_of;
 use crate::{
     mm::PTEFlags,
     task::{
-        change_program_brk, cur_user_addr_translate, cur_user_addr_translate_page_align_checked,
-        exit_current_and_run_next, get_syscall_counter, suspend_current_and_run_next,
+        add_address_mapping, change_program_brk, cur_user_addr_translate,
+        cur_user_addr_translate_page_align_checked, exit_current_and_run_next, get_syscall_counter,
+        suspend_current_and_run_next,
     },
     timer::get_time_us,
 };
@@ -95,9 +96,15 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
 }
 
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    let start_va = start;
+    let end_va = start + len;
+    if add_address_mapping(start_va, end_va, port) {
+        0
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Implement munmap.
