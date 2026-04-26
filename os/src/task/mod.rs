@@ -16,7 +16,9 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
+use crate::syscall::SYSCALL_IDS;
 use crate::trap::TrapContext;
+use alloc::vec;
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
@@ -46,6 +48,8 @@ struct TaskManagerInner {
     tasks: Vec<TaskControlBlock>,
     /// id of current `Running` task
     current_task: usize,
+    /// syscall counter, (syscall_id, count)
+    syscall_counter: Vec<(usize, usize)>,
 }
 
 lazy_static! {
@@ -58,12 +62,17 @@ lazy_static! {
         for i in 0..num_app {
             tasks.push(TaskControlBlock::new(get_app_data(i), i));
         }
+        let mut syscall_counter = vec![];
+        for id in SYSCALL_IDS {
+            syscall_counter.push((id, 0));
+        }
         TaskManager {
             num_app,
             inner: unsafe {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
+                    syscall_counter,
                 })
             },
         }
@@ -153,6 +162,35 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+    /// Get syscall counter
+    fn get_syscall_counter(&self, syscall_id: usize) -> Option<usize> {
+        let inner = self.inner.exclusive_access();
+        inner
+            .syscall_counter
+            .iter()
+            .find_map(|&(id, cnt)| (id == syscall_id).then_some(cnt))
+    }
+    /// Increment syscall counter
+    fn inc_syscall_counter(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        if let Some((_id, cnt)) = inner
+            .syscall_counter
+            .iter_mut()
+            .find(|&&mut (id, _cnt)| (id == syscall_id))
+        {
+            *cnt += 1;
+        }
+    }
+}
+
+/// Get syscall counter
+pub fn get_syscall_counter(syscall_id: usize) -> usize {
+    TASK_MANAGER.get_syscall_counter(syscall_id).unwrap_or(0)
+}
+
+/// Increment syscall counter
+pub fn inc_syscall_counter(syscall_id: usize) {
+    TASK_MANAGER.inc_syscall_counter(syscall_id)
 }
 
 /// Run the first task in task list.

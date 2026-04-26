@@ -1,5 +1,8 @@
 //! Process management syscalls
-use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::task::{
+    change_program_brk, exit_current_and_run_next, get_syscall_counter,
+    suspend_current_and_run_next,
+};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -32,9 +35,17 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// TODO: Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
-pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
+pub fn sys_trace(trace_request: usize, id: usize, _data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    match trace_request {
+        0 => todo!(),
+        1 => todo!(),
+        2 => {
+            let syscall_id = id;
+            get_syscall_counter(syscall_id) as isize
+        }
+        _ => -1,
+    }
 }
 
 // YOUR JOB: Implement mmap.
