@@ -3,9 +3,10 @@
 use core::mem::size_of;
 
 use crate::{
+    mm::PTEFlags,
     task::{
-        change_program_brk, exit_current_and_run_next, get_syscall_counter, get_user_addr_map,
-        get_user_addr_map_page_align_checked, suspend_current_and_run_next,
+        change_program_brk, cur_user_addr_translate, cur_user_addr_translate_page_align_checked,
+        exit_current_and_run_next, get_syscall_counter, suspend_current_and_run_next,
     },
     timer::get_time_us,
 };
@@ -39,7 +40,9 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     let us = get_time_us();
     let va = ts as *const _ as usize;
     let len = size_of::<TimeVal>();
-    if let Some(pa) = get_user_addr_map_page_align_checked(va, len) {
+    if let Some(pa) =
+        cur_user_addr_translate_page_align_checked(va, len, Some(PTEFlags::R | PTEFlags::W))
+    {
         let pa = pa as *mut _;
         // Safety: We can directly dereference the user's physical address,
         // bacause the user's address area is identically mapped in the kerenl's page table.
@@ -62,7 +65,7 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     match trace_request {
         0 => {
             let va = id as *const u8 as usize;
-            if let Some(pa) = get_user_addr_map(va) {
+            if let Some(pa) = cur_user_addr_translate(va, Some(PTEFlags::R)) {
                 let pa = pa as *const u8;
                 // Safety: We can directly dereference the user's physical address,
                 // bacause the user's address area is identically mapped in the kerenl's page table.
@@ -73,7 +76,7 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
         }
         1 => {
             let va = id as *const u8 as usize;
-            if let Some(pa) = get_user_addr_map(va) {
+            if let Some(pa) = cur_user_addr_translate(va, Some(PTEFlags::R | PTEFlags::W)) {
                 let pa = pa as *mut u8;
                 // Safety: We can directly dereference the user's physical address,
                 // bacause the user's address area is identically mapped in the kerenl's page table.

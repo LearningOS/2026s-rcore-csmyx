@@ -5,6 +5,8 @@ use core::fmt::{self, Debug, Formatter};
 /// physical address
 const PA_WIDTH_SV39: usize = 56;
 const VA_WIDTH_SV39: usize = 39;
+pub const SV39_CHECK_LOW_BITS: usize = 37;
+pub const SV39_CHECK_HIGH_BITS: usize = 26;
 const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 

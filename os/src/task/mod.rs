@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::PTEFlags;
 use crate::sync::UPSafeCell;
 use crate::syscall::SyscallId;
 use crate::trap::TrapContext;
@@ -117,15 +118,20 @@ impl TaskManager {
 
     /// Translate virtual address to physical address.
     /// Return None if the mapping is not valid.
-    fn get_current_addr_map_page_align_checked(&self, va: usize, len: usize) -> Option<usize> {
+    fn cur_user_addr_translate_page_align_checked(
+        &self,
+        va: usize,
+        len: usize,
+        flags: Option<PTEFlags>,
+    ) -> Option<usize> {
         let inner = self.inner.exclusive_access();
-        inner.tasks[inner.current_task].get_user_addr_map_page_align_checked(va, len)
+        inner.tasks[inner.current_task].user_addr_translate_page_align_checked(va, len, flags)
     }
     /// Translate virtual address to physical address.
     /// Return None if the mapping is not valid.
-    fn get_current_addr_map(&self, va: usize) -> Option<usize> {
+    fn cur_user_addr_translate(&self, va: usize, flags: Option<PTEFlags>) -> Option<usize> {
         let inner = self.inner.exclusive_access();
-        inner.tasks[inner.current_task].get_user_addr_map(va)
+        inner.tasks[inner.current_task].user_addr_translate(va, flags)
     }
     /// Get the current 'Running' task's token.
     fn get_current_token(&self) -> usize {
@@ -242,16 +248,20 @@ pub fn current_user_token() -> usize {
 
 /// Translating the virtual address to physical address through the current task's page table.
 /// Return None if the mapping is not valid.
-pub fn get_user_addr_map(va: usize) -> Option<usize> {
-    TASK_MANAGER.get_current_addr_map(va)
+pub fn cur_user_addr_translate(va: usize, flags: Option<PTEFlags>) -> Option<usize> {
+    TASK_MANAGER.cur_user_addr_translate(va, flags)
 }
 
 /// Translating the virtual address to physical address through the current task's page table.
 /// Return None if:
 /// 1. the mapping is not valid, or
 /// 2. address area [va, va+len-1] is splitted by two pages
-pub fn get_user_addr_map_page_align_checked(va: usize, len: usize) -> Option<usize> {
-    TASK_MANAGER.get_current_addr_map_page_align_checked(va, len)
+pub fn cur_user_addr_translate_page_align_checked(
+    va: usize,
+    len: usize,
+    flags: Option<PTEFlags>,
+) -> Option<usize> {
+    TASK_MANAGER.cur_user_addr_translate_page_align_checked(va, len, flags)
 }
 
 /// Get the current 'Running' task's trap contexts.

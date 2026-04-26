@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use super::TaskContext;
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::mm::{
-    kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
+    kernel_stack_position, MapPermission, MemorySet, PTEFlags, PhysPageNum, VirtAddr, KERNEL_SPACE,
 };
 use crate::syscall::{SyscallId, SYSCALL_IDS};
 use crate::trap::{trap_handler, TrapContext};
@@ -44,15 +44,22 @@ impl TaskControlBlock {
     }
     /// Translate virtual address to physical address by current memory set.
     /// return None if is not page aligned or the mapping is not valid
-    pub fn get_user_addr_map_page_align_checked(&self, va: usize, len: usize) -> Option<usize> {
+    pub fn user_addr_translate_page_align_checked(
+        &self,
+        va: usize,
+        len: usize,
+        flags: Option<PTEFlags>,
+    ) -> Option<usize> {
         self.memory_set
-            .translate_addr_page_align_checked(va.into(), (va + len - 1).into())
+            .translate_addr_page_align_checked(va.into(), (va + len - 1).into(), flags)
             .map(|pa| pa.0)
     }
     /// Translate virtual address to physical address by current memory set.
     /// Return None if the mapping is not valid.
-    pub fn get_user_addr_map(&self, va: usize) -> Option<usize> {
-        self.memory_set.translate_addr(va.into()).map(|pa| pa.0)
+    pub fn user_addr_translate(&self, va: usize, flags: Option<PTEFlags>) -> Option<usize> {
+        self.memory_set
+            .translate_addr(va.into(), flags)
+            .map(|pa| pa.0)
     }
     /// get the user token
     pub fn get_user_token(&self) -> usize {
