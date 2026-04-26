@@ -25,16 +25,26 @@ const SYSCALL_MMAP: usize = 222;
 /// trace syscall
 const SYSCALL_TRACE: usize = 410;
 
+/// type for syscal_id
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyscallId(usize);
+
+impl From<usize> for SyscallId {
+    fn from(id: usize) -> Self {
+        Self(id)
+    }
+}
+
 /// syscall ids
-pub const SYSCALL_IDS: [usize; 8] = [
-    SYSCALL_WRITE,
-    SYSCALL_EXIT,
-    SYSCALL_YIELD,
-    SYSCALL_GET_TIME,
-    SYSCALL_SBRK,
-    SYSCALL_MUNMAP,
-    SYSCALL_MMAP,
-    SYSCALL_TRACE,
+pub const SYSCALL_IDS: [SyscallId; 8] = [
+    SyscallId(SYSCALL_WRITE),
+    SyscallId(SYSCALL_EXIT),
+    SyscallId(SYSCALL_YIELD),
+    SyscallId(SYSCALL_GET_TIME),
+    SyscallId(SYSCALL_SBRK),
+    SyscallId(SYSCALL_MUNMAP),
+    SyscallId(SYSCALL_MMAP),
+    SyscallId(SYSCALL_TRACE),
 ];
 
 mod fs;

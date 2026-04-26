@@ -163,7 +163,7 @@ impl TaskManager {
         }
     }
     /// Get syscall counter
-    fn get_syscall_counter(&self, syscall_id: usize) -> Option<usize> {
+    fn get_syscall_counter(&self, syscall_id: SyscallId) -> Option<usize> {
         let inner = self.inner.exclusive_access();
         inner
             .syscall_counter
@@ -171,7 +171,7 @@ impl TaskManager {
             .find_map(|&(id, cnt)| (id == syscall_id).then_some(cnt))
     }
     /// Increment syscall counter
-    fn inc_syscall_counter(&self, syscall_id: usize) {
+    fn inc_syscall_counter(&self, syscall_id: SyscallId) {
         let mut inner = self.inner.exclusive_access();
         if let Some((_id, cnt)) = inner
             .syscall_counter
@@ -185,12 +185,14 @@ impl TaskManager {
 
 /// Get syscall counter
 pub fn get_syscall_counter(syscall_id: usize) -> usize {
-    TASK_MANAGER.get_syscall_counter(syscall_id).unwrap_or(0)
+    TASK_MANAGER
+        .get_syscall_counter(syscall_id.into())
+        .unwrap_or(0)
 }
 
 /// Increment syscall counter
 pub fn inc_syscall_counter(syscall_id: usize) {
-    TASK_MANAGER.inc_syscall_counter(syscall_id)
+    TASK_MANAGER.inc_syscall_counter(syscall_id.into())
 }
 
 /// Run the first task in task list.
