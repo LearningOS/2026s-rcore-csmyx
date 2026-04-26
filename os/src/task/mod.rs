@@ -16,9 +16,8 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
-use crate::syscall::{SyscallId, SYSCALL_IDS};
+use crate::syscall::SyscallId;
 use crate::trap::TrapContext;
-use alloc::vec;
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
@@ -48,8 +47,6 @@ struct TaskManagerInner {
     tasks: Vec<TaskControlBlock>,
     /// id of current `Running` task
     current_task: usize,
-    /// syscall counter, (syscall_id, count)
-    syscall_counter: Vec<(SyscallId, usize)>,
 }
 
 lazy_static! {
@@ -62,17 +59,12 @@ lazy_static! {
         for i in 0..num_app {
             tasks.push(TaskControlBlock::new(get_app_data(i), i));
         }
-        let mut syscall_counter = vec![];
-        for id in SYSCALL_IDS {
-            syscall_counter.push((id, 0));
-        }
         TaskManager {
             num_app,
             inner: unsafe {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
-                    syscall_counter,
                 })
             },
         }
@@ -177,7 +169,8 @@ impl TaskManager {
     /// Get syscall count
     fn get_syscall_count(&self, syscall_id: SyscallId) -> Option<usize> {
         let inner = self.inner.exclusive_access();
-        inner
+        let cur = inner.current_task;
+        inner.tasks[cur]
             .syscall_counter
             .iter()
             .find_map(|&(id, cnt)| (id == syscall_id).then_some(cnt))
@@ -185,7 +178,8 @@ impl TaskManager {
     /// Increment syscall count
     fn inc_syscall_count(&self, syscall_id: SyscallId) {
         let mut inner = self.inner.exclusive_access();
-        if let Some((id, cnt)) = inner
+        let cur = inner.current_task;
+        if let Some((id, cnt)) = inner.tasks[cur]
             .syscall_counter
             .iter_mut()
             .find(|&&mut (id, _cnt)| (id == syscall_id))

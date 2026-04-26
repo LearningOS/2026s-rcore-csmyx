@@ -1,9 +1,13 @@
 //! Types related to task management
+use alloc::vec;
+use alloc::vec::Vec;
+
 use super::TaskContext;
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::mm::{
     kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
 };
+use crate::syscall::{SyscallId, SYSCALL_IDS};
 use crate::trap::{trap_handler, TrapContext};
 
 /// The task control block (TCB) of a task.
@@ -28,6 +32,9 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// syscall counter, (syscall_id, count)
+    pub syscall_counter: Vec<(SyscallId, usize)>,
 }
 
 impl TaskControlBlock {
@@ -67,6 +74,10 @@ impl TaskControlBlock {
             kernel_stack_top.into(),
             MapPermission::R | MapPermission::W,
         );
+        let mut syscall_counter = vec![];
+        for id in SYSCALL_IDS {
+            syscall_counter.push((id, 0));
+        }
         let task_control_block = Self {
             task_status,
             task_cx: TaskContext::goto_trap_return(kernel_stack_top),
@@ -75,6 +86,7 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            syscall_counter,
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
