@@ -11,6 +11,12 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 
+/// Default task priority
+const DEFAULT_PRIORITY: usize = 16;
+/// Big stride constant
+const BIG_STRIDE: usize = 0x1000000;
+// const BIG_STRIDE: usize = usize::MAX / 2;
+
 /// Task control block structure
 ///
 /// Directly save the contents that will not change during running
@@ -35,6 +41,12 @@ impl TaskControlBlock {
     pub fn get_user_token(&self) -> usize {
         let inner = self.inner_exclusive_access();
         inner.memory_set.token()
+    }
+    /// update stride
+    pub fn update_stride(&self) {
+        let mut inner = self.inner_exclusive_access();
+        let pass = BIG_STRIDE / inner.priority;
+        inner.stride += pass;
     }
 }
 
@@ -73,6 +85,12 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// Priority
+    pub priority: usize,
+
+    /// Stride
+    pub stride: usize,
 }
 
 impl TaskControlBlockInner {
@@ -168,6 +186,8 @@ impl TaskControlBlock {
                     ],
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    priority: DEFAULT_PRIORITY,
+                    stride: 0,
                 })
             },
         };
@@ -212,6 +232,8 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    priority: DEFAULT_PRIORITY,
+                    stride: 0,
                 })
             },
         });
@@ -296,6 +318,8 @@ impl TaskControlBlock {
                     fd_table: new_fd_table,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    priority: DEFAULT_PRIORITY,
+                    stride: 0,
                 })
             },
         });

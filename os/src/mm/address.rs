@@ -221,7 +221,7 @@ impl StepByOne for PhysPageNum {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 /// a simple range structure for type T
 pub struct SimpleRange<T>
 where
@@ -244,8 +244,22 @@ where
     pub fn get_end(&self) -> T {
         self.r
     }
-    pub fn is_overlap(&self, other: &Self) -> bool {
+    pub fn overlap_with(&self, other: &Self) -> bool {
         !(self.r <= other.l || other.r <= self.l)
+    }
+    /// todo doc
+    pub fn exclude(&self, other: &Self) -> Option<(Self, Self)> {
+        if self.contains(other) {
+            Some((Self::new(self.l, other.l), Self::new(other.r, self.r)))
+        } else {
+            None
+        }
+    }
+    pub fn contains(&self, other: &Self) -> bool {
+        self.l <= other.l && other.r <= self.r
+    }
+    pub fn is_empty(&self) -> bool {
+        self.l >= self.r
     }
 }
 impl<T> IntoIterator for SimpleRange<T>
