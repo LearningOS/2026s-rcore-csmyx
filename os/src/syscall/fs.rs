@@ -18,7 +18,9 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         let file = file.clone();
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
-        file.write(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+        file.write(UserBuffer::new(
+            translated_byte_buffer(token, buf, len).unwrap(),
+        )) as isize
     } else {
         -1
     }
@@ -40,7 +42,9 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
         trace!("kernel: sys_read .. file.read");
-        file.read(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+        file.read(UserBuffer::new(
+            translated_byte_buffer(token, buf, len).unwrap(),
+        )) as isize
     } else {
         -1
     }

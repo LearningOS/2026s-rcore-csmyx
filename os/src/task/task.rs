@@ -3,7 +3,7 @@ use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::fs::{File, Stdin, Stdout};
-use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::mm::{MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::sync::{Arc, Weak};
@@ -95,6 +95,37 @@ impl TaskControlBlockInner {
             self.fd_table.push(None);
             self.fd_table.len() - 1
         }
+    }
+    #[must_use]
+    pub fn mmap(&mut self, start_va: usize, end_va: usize, permission: usize) -> bool {
+        let start_va = VirtAddr::from(start_va);
+        let end_va = VirtAddr::from(end_va);
+        if !start_va.aligned() {
+            return false;
+        }
+        if (permission & 0b111 == 0) || (permission >> 3 != 0) {
+            return false;
+        }
+        let mut perm = MapPermission::U;
+        if permission & 0b001 != 0 {
+            perm |= MapPermission::R;
+        }
+        if permission & 0b010 != 0 {
+            perm |= MapPermission::W;
+        }
+        if permission & 0b100 != 0 {
+            perm |= MapPermission::X;
+        }
+        self.memory_set.insert_area_checked(start_va, end_va, perm)
+    }
+    #[must_use]
+    pub fn munmap(&mut self, start_va: usize, end_va: usize) -> bool {
+        let start_va = VirtAddr::from(start_va);
+        let end_va = VirtAddr::from(end_va);
+        if !start_va.aligned() {
+            return false;
+        }
+        self.memory_set.remove_area_checked(start_va, end_va)
     }
 }
 
