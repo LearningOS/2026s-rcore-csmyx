@@ -230,7 +230,7 @@ where
     pub fn overlap_with(&self, other: &Self) -> bool {
         !(self.r <= other.l || other.r <= self.l)
     }
-    /// todo doc
+    /// Exclude a sub range from current range, which emerges two new range.
     pub fn exclude(&self, other: &Self) -> Option<(Self, Self)> {
         if self.contains(other) {
             Some((Self::new(self.l, other.l), Self::new(other.r, self.r)))

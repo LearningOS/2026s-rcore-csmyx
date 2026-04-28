@@ -60,8 +60,9 @@ impl MemorySet {
             None,
         );
     }
-    /// todo doc
-    pub fn insert_area_checked(
+    /// Try to insert a continuous virtual address range to current memory set.
+    /// Return false if failed.
+    pub fn try_insert_va_range(
         &mut self,
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -72,8 +73,9 @@ impl MemorySet {
             None,
         )
     }
-    /// todo doc
-    pub fn remove_area_checked(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+    /// Try to remove a continuous virtual address range to current memory set.
+    /// Return false if failed.
+    pub fn try_remove_va_range(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
         self.try_pop(VPNRange::new(start_va.floor(), end_va.ceil()))
     }
     /// remove a area
@@ -436,7 +438,6 @@ impl MapArea {
         true
     }
     // Exclude a sub range from current range
-    // todo doc
     pub fn exclude(
         &mut self,
         page_table: &mut PageTable,
