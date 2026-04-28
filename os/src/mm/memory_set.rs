@@ -60,6 +60,22 @@ impl MemorySet {
             None,
         );
     }
+    /// todo doc
+    pub fn insert_area_checked(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) -> bool {
+        self.try_push(
+            MapArea::new(start_va, end_va, MapType::Framed, permission),
+            None,
+        )
+    }
+    /// todo doc
+    pub fn remove_area_checked(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        self.try_pop(VPNRange::new(start_va.floor(), end_va.ceil()))
+    }
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self
@@ -71,6 +87,32 @@ impl MemorySet {
             area.unmap(&mut self.page_table);
             self.areas.remove(idx);
         }
+    }
+    /// Try to add a new MapArea into this MemorySet.
+    /// Return false if thers exists a map area is overlapped with this one.
+    fn try_push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> bool {
+        if !self.areas.iter().any(|a| a.is_overlap(&map_area)) {
+            if map_area.map(&mut self.page_table) {
+                if let Some(data) = data {
+                    map_area.copy_data(&mut self.page_table, data);
+                }
+                self.areas.push(map_area);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+    /// Try to remove a MapArea into this MemorySet.
+    /// Return false if this map area had not been mapped.
+    fn try_pop(&mut self, range: VPNRange) -> bool {
+        self.areas
+            .iter_mut()
+            .find(|a| a.vpn_range == range)
+            .map(|area| area.unmap(&mut self.page_table))
+            .unwrap_or(false)
     }
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
@@ -333,48 +375,63 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+    pub fn is_overlap(&self, other: &Self) -> bool {
+        self.vpn_range.is_overlap(&other.vpn_range)
+    }
+    /// Return false if match one of them:
+    /// 1. `frame_alloc` failed;
+    /// 2. `page_table.map` failed.
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> bool {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
                 ppn = PhysPageNum(vpn.0);
             }
             MapType::Framed => {
-                let frame = frame_alloc().unwrap();
-                ppn = frame.ppn;
-                self.data_frames.insert(vpn, frame);
+                if let Some(frame) = frame_alloc() {
+                    ppn = frame.ppn;
+                    self.data_frames.insert(vpn, frame);
+                } else {
+                    return false;
+                }
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
+        page_table.map(vpn, ppn, pte_flags)
     }
-    pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+    pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> bool {
         if self.map_type == MapType::Framed {
             self.data_frames.remove(&vpn);
         }
-        page_table.unmap(vpn);
+        page_table.unmap(vpn)
     }
-    pub fn map(&mut self, page_table: &mut PageTable) {
+    pub fn map(&mut self, page_table: &mut PageTable) -> bool {
         for vpn in self.vpn_range {
-            self.map_one(page_table, vpn);
+            if !self.map_one(page_table, vpn) {
+                return false;
+            }
         }
+        true
     }
-    pub fn unmap(&mut self, page_table: &mut PageTable) {
+    pub fn unmap(&mut self, page_table: &mut PageTable) -> bool {
         for vpn in self.vpn_range {
-            self.unmap_one(page_table, vpn);
+            if !self.unmap_one(page_table, vpn) {
+                return false;
+            }
         }
+        true
     }
     #[allow(unused)]
     pub fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(new_end, self.vpn_range.get_end()) {
-            self.unmap_one(page_table, vpn)
+            self.unmap_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }
     #[allow(unused)]
     pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
-            self.map_one(page_table, vpn)
+            self.map_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }
