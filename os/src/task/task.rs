@@ -134,7 +134,7 @@ impl TaskControlBlockInner {
         if permission & 0b100 != 0 {
             perm |= MapPermission::X;
         }
-        self.memory_set.insert_area_checked(start_va, end_va, perm)
+        self.memory_set.try_insert_va_range(start_va, end_va, perm)
     }
     #[must_use]
     pub fn munmap(&mut self, start_va: usize, end_va: usize) -> bool {
@@ -143,7 +143,7 @@ impl TaskControlBlockInner {
         if !start_va.aligned() {
             return false;
         }
-        self.memory_set.remove_area_checked(start_va, end_va)
+        self.memory_set.try_remove_va_range(start_va, end_va)
     }
 }
 
@@ -203,7 +203,7 @@ impl TaskControlBlock {
         task_control_block
     }
 
-    /// todo doc
+    /// Spawn a new task.
     pub fn spawn(self: &Arc<Self>, elf_data: &[u8]) -> Arc<Self> {
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
@@ -226,7 +226,7 @@ impl TaskControlBlock {
                     task_cx: TaskContext::goto_trap_return(kernel_stack_top),
                     task_status: TaskStatus::Ready,
                     memory_set,
-                    // set parent
+                    // set self as it's parent
                     parent: Some(Arc::downgrade(self)),
                     children: Vec::new(),
                     exit_code: 0,
@@ -238,7 +238,7 @@ impl TaskControlBlock {
             },
         });
         let mut parent_inner = self.inner_exclusive_access();
-        // set children
+        // set it as self's children
         parent_inner.children.push(task_control_block.clone());
         // prepare TrapContext in user space
         let trap_cx = task_control_block.inner_exclusive_access().get_trap_cx();

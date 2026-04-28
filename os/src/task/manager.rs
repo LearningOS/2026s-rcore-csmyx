@@ -27,29 +27,21 @@ impl TaskManager {
         self.stride_schedule()
     }
 
-    /// todo doc
+    /// Round Robin schdule.
     #[allow(unused)]
     fn round_robin_schedule(&mut self) -> Option<Arc<TaskControlBlock>> {
         Some(self.ready_queue.remove(0))
     }
 
-    /// todo doc
+    /// Stride schedule.
     #[allow(unused)]
     fn stride_schedule(&mut self) -> Option<Arc<TaskControlBlock>> {
         let (i, _) = self
             .ready_queue
             .iter()
             .enumerate()
-            // .inspect(|&(i, tcb)| {
-            //     println!(
-            //         "task {}, stride: {}",
-            //         i,
-            //         tcb.inner_exclusive_access().stride
-            //     )
-            // })
             .min_by_key(|&(_, tcb)| tcb.inner_exclusive_access().stride)?;
         let tcb = self.ready_queue.remove(i);
-        // println!("choose {}", i);
         tcb.update_stride();
         Some(tcb)
     }
