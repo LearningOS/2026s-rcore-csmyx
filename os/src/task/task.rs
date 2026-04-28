@@ -205,6 +205,7 @@ impl TaskControlBlock {
 
     /// Spawn a new task.
     pub fn spawn(self: &Arc<Self>, elf_data: &[u8]) -> Arc<Self> {
+        let mut parent_inner = self.inner_exclusive_access();
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
         let trap_cx_ppn = memory_set
@@ -215,6 +216,19 @@ impl TaskControlBlock {
         let pid_handle = pid_alloc();
         let kernel_stack = kstack_alloc();
         let kernel_stack_top = kernel_stack.get_top();
+        // copy fd table
+        let new_fd_table: Vec<_> = parent_inner
+            .fd_table
+            .iter()
+            .map(|fd| fd.as_ref().map(|file| file.clone()))
+            .collect();
+        // for fd in parent_inner.fd_table.iter() {
+        //     if let Some(file) = fd {
+        //         new_fd_table.push(Some(file.clone()));
+        //     } else {
+        //         new_fd_table.push(None);
+        //     }
+        // }
         // push a task context which goes to trap_return to the top of kernel stack
         let task_control_block = Arc::new(TaskControlBlock {
             pid: pid_handle,
@@ -234,10 +248,10 @@ impl TaskControlBlock {
                     program_brk: user_sp,
                     priority: DEFAULT_PRIORITY,
                     stride: 0,
+                    fd_table: new_fd_table,
                 })
             },
         });
-        let mut parent_inner = self.inner_exclusive_access();
         // set it as self's children
         parent_inner.children.push(task_control_block.clone());
         // prepare TrapContext in user space
