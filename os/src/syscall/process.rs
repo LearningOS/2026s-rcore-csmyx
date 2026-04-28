@@ -1,10 +1,12 @@
 //! Process management syscalls
 //!
+use core::ptr::slice_from_raw_parts;
+
 use alloc::sync::Arc;
 
 use crate::{
     fs::{open_file, OpenFlags},
-    mm::{translated_refmut, translated_str},
+    mm::{translated_byte_buffer, translated_refmut, translated_str},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
         suspend_current_and_run_next,
@@ -178,8 +180,9 @@ pub fn sys_spawn(path: *const u8) -> isize {
     let cur_task = current_task().unwrap();
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
-        let task = cur_task.spawn(data);
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let data = app_inode.read_all();
+        let task = cur_task.spawn(&data);
         let pid = task.getpid();
         add_task(task);
         pid as isize
