@@ -91,7 +91,7 @@ impl MemorySet {
     /// Try to add a new MapArea into this MemorySet.
     /// Return false if thers exists a map area is overlapped with this one.
     fn try_push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> bool {
-        if !self.areas.iter().any(|a| a.is_overlap(&map_area)) {
+        if !self.areas.iter().any(|a| a.overlap_with(&map_area)) {
             if map_area.map(&mut self.page_table) {
                 if let Some(data) = data {
                     map_area.copy_data(&mut self.page_table, data);
@@ -108,11 +108,25 @@ impl MemorySet {
     /// Try to remove a MapArea into this MemorySet.
     /// Return false if this map area had not been mapped.
     fn try_pop(&mut self, range: VPNRange) -> bool {
-        self.areas
+        if let Some((i, area)) = self
+            .areas
             .iter_mut()
-            .find(|a| a.vpn_range == range)
-            .map(|area| area.unmap(&mut self.page_table))
-            .unwrap_or(false)
+            .enumerate()
+            .find(|(_, area)| area.vpn_range.contains(&range))
+        {
+            // Safety: unwrap is safe because we have tested `area.vpn_range.contains(&range)`.
+            let (a, b) = area.exclude(&mut self.page_table, range).unwrap();
+            self.areas.remove(i);
+            if let Some(b) = b {
+                self.areas.push(b);
+            }
+            if let Some(a) = a {
+                self.areas.push(a);
+            }
+            true
+        } else {
+            false
+        }
     }
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
@@ -367,6 +381,14 @@ impl MapArea {
             map_perm,
         }
     }
+    pub fn from_range(vpn_range: VPNRange, map_type: MapType, map_perm: MapPermission) -> Self {
+        Self {
+            vpn_range,
+            data_frames: BTreeMap::new(),
+            map_type,
+            map_perm,
+        }
+    }
     pub fn from_another(another: &Self) -> Self {
         Self {
             vpn_range: VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
@@ -375,8 +397,8 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
-    pub fn is_overlap(&self, other: &Self) -> bool {
-        self.vpn_range.is_overlap(&other.vpn_range)
+    pub fn overlap_with(&self, other: &Self) -> bool {
+        self.vpn_range.overlap_with(&other.vpn_range)
     }
     /// Return false if match one of them:
     /// 1. `frame_alloc` failed;
@@ -412,6 +434,34 @@ impl MapArea {
             }
         }
         true
+    }
+    // Exclude a sub range from current range
+    // todo doc
+    pub fn exclude(
+        &mut self,
+        page_table: &mut PageTable,
+        range: VPNRange,
+    ) -> Option<(Option<Self>, Option<Self>)> {
+        if let Some((a, b)) = self.vpn_range.exclude(&range) {
+            for vpn in range {
+                if !self.unmap_one(page_table, vpn) {
+                    return None;
+                }
+            }
+            let first = if !a.is_empty() {
+                Some(Self::from_range(a, self.map_type, self.map_perm))
+            } else {
+                None
+            };
+            let second = if !b.is_empty() {
+                Some(Self::from_range(b, self.map_type, self.map_perm))
+            } else {
+                None
+            };
+            Some((first, second))
+        } else {
+            None
+        }
     }
     pub fn unmap(&mut self, page_table: &mut PageTable) -> bool {
         for vpn in self.vpn_range {
