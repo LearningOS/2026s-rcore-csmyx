@@ -26,6 +26,7 @@ impl BlockDevice for BlockFile {
 }
 
 fn main() {
+    // coredump::register_panic_handler();
     easy_fs_pack().expect("Error when packing easy-fs!");
 }
 
@@ -48,6 +49,8 @@ fn easy_fs_pack() -> std::io::Result<()> {
         .get_matches();
     let src_path = matches.value_of("source").unwrap();
     let target_path = matches.value_of("target").unwrap();
+    // let src_path = "../user/build/app/";
+    // let target_path = "../user/target/riscv64gc-unknown-none-elf/debug/";
     println!("src_path = {}\ntarget_path = {}", src_path, target_path);
     let block_file = Arc::new(BlockFile(Mutex::new({
         let f = OpenOptions::new()

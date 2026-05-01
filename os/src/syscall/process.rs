@@ -155,10 +155,10 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access();
     if inner.munmap(start_va, end_va) {
-        println!("unmap {:#x} {:#x} succed", start_va, end_va);
+        // println!("unmap {:#x} {:#x} succed", start_va, end_va);
         0
     } else {
-        println!("unmap {:#x} {:#x} fail", start_va, end_va);
+        // println!("unmap {:#x} {:#x} fail", start_va, end_va);
         -1
     }
 }

@@ -1,4 +1,6 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
+use core::ptr::slice_from_raw_parts;
+
 use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use alloc::string::String;
 use alloc::vec;
@@ -248,6 +250,32 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .translate_va(VirtAddr::from(va))
         .unwrap()
         .get_mut()
+}
+
+/// Translate ptr[T] through page table and write `src` to `ptr` byte by byte.
+pub fn translated_write<T>(token: usize, ptr: *mut T, src: T) {
+    let page_table = PageTable::from_token(token);
+    let data =
+        unsafe { &*slice_from_raw_parts(&src as *const _ as *const u8, core::mem::size_of::<T>()) };
+
+    // Bugfix: this is bad, because byte's type is `&u8`(we fogot to deref `byte` to u8)
+    // which cause get_mut<T> deduce `T` as &u8, not the expected u8.
+    //
+    // data.iter().zip(ptr as usize..).for_each(|(byte, va)| { // forget deref the parameter `byte` of this closure.
+    //     *(page_table
+    //         .translate_va(VirtAddr::from(va))
+    //         .unwrap()
+    //         .get_mut()) = byte;
+    // });
+    //
+    // So, We'e better to add explicty type annotation to get_mut, through here it's not necesserary,
+    // because we have change `byte` to `&byte`(byte's type is u8 now).
+    data.iter().zip(ptr as usize..).for_each(|(&byte, va)| {
+        *(page_table
+            .translate_va(VirtAddr::from(va))
+            .unwrap()
+            .get_mut::<u8>()) = byte;
+    });
 }
 
 /// An abstraction over a buffer passed from user space to kernel space

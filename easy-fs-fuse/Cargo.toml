@@ -10,7 +10,18 @@ edition = "2018"
 clap = "2.33.3"
 easy-fs = { path = "../easy-fs" }
 rand = "0.8.0"
+coredump = "0.1.2"
 
 # [features]
 # board_qemu = []
 # board_k210 = []
+
+[profile.release]
+# opt-level = "z" # Optimize for size.
+# strip = true    # Automatically strip symbols from the binary.
+# lto = tru
+opt-level = 0      # 关闭优化
+debug = true       # 开启调试信息
+strip = false      # 不删除符号
+lto = false        # 关闭链接优化
+panic = "unwind"   # 允许调试

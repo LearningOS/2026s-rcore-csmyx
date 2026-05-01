@@ -6,7 +6,7 @@ use core::fmt::{Debug, Formatter, Result};
 /// Magic number for sanity check
 const EFS_MAGIC: u32 = 0x3b800001;
 /// The max number of direct inodes
-const INODE_DIRECT_COUNT: usize = 28;
+const INODE_DIRECT_COUNT: usize = 27;
 /// The max length of inode name
 const NAME_LENGTH_LIMIT: usize = 27;
 /// The max number of indirect1 inodes
@@ -85,6 +85,7 @@ pub struct DiskInode {
     pub direct: [u32; INODE_DIRECT_COUNT],
     pub indirect1: u32,
     pub indirect2: u32,
+    pub nlink: u32, // hard link count
     type_: DiskInodeType,
 }
 
@@ -96,7 +97,23 @@ impl DiskInode {
         self.direct.iter_mut().for_each(|v| *v = 0);
         self.indirect1 = 0;
         self.indirect2 = 0;
+        self.nlink = 1; // count self as the first hard link
         self.type_ = type_;
+    }
+    pub fn link_count(&self) -> usize {
+        self.nlink as usize
+    }
+    // increment link count
+    pub fn inc_link_count(&mut self) -> usize {
+        assert!(self.nlink < u32::MAX);
+        self.nlink += 1;
+        self.nlink as usize
+    }
+    // decrement link count
+    pub fn dec_link_count(&mut self) -> usize {
+        assert!(self.nlink > 0);
+        self.nlink -= 1;
+        self.nlink as usize
     }
     /// Whether this inode is a directory
     pub fn is_dir(&self) -> bool {
@@ -161,7 +178,13 @@ impl DiskInode {
                 })
         }
     }
-    /// Inncrease the size of current disk inode
+    /// Decrease the size of current disk inode
+    pub fn decrease_size(&mut self, new_size: u32, _block_device: &Arc<dyn BlockDevice>) {
+        self.size = new_size;
+        // TODO: remove blocks in direct/indirect.
+        // todo!()
+    }
+    /// Increase the size of current disk inode
     pub fn increase_size(
         &mut self,
         new_size: u32,

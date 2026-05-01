@@ -53,6 +53,11 @@ impl OSInode {
         }
         v
     }
+    /// get inode
+    pub fn get_inode(&self) -> Arc<Inode> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.clone()
+    }
 }
 
 lazy_static! {
@@ -110,6 +115,7 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
             inode.clear();
             Some(Arc::new(OSInode::new(readable, writable, inode)))
         } else {
+            // info!("create file {}", name);
             // create file
             ROOT_INODE
                 .create(name)
@@ -123,6 +129,19 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
             Arc::new(OSInode::new(readable, writable, inode))
         })
     }
+}
+
+/// Find a file
+pub fn find_file(name: &str) -> Option<Arc<Inode>> {
+    ROOT_INODE.find(name)
+}
+/// Creat a dir_entry for mapping `name` to `inode` in ROOT folder.
+pub fn create_entry(name: &str, inode: Arc<Inode>) -> bool {
+    ROOT_INODE.create_entry(name, inode)
+}
+/// Delete a dir_entry of `name` form root folder.
+pub fn delete_entry(name: &str, inode: Arc<Inode>) -> bool {
+    ROOT_INODE.delete_entry(name, inode)
 }
 
 impl File for OSInode {
