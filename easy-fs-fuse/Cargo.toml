@@ -10,6 +10,7 @@ edition = "2018"
 clap = "2.33.3"
 easy-fs = { path = "../easy-fs" }
 rand = "0.8.0"
+zerocopy = "=0.8.23"
 
 # [features]
 # board_qemu = []
