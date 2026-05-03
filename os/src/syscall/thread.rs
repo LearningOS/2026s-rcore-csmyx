@@ -49,7 +49,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
         new_task.kstack.get_top(),
         trap_handler as usize,
     );
-    (*new_task_trap_cx).x[10] = arg;
+    new_task_trap_cx.x[10] = arg;
     new_task_tid as isize
 }
 /// get current thread id syscall
@@ -114,6 +114,11 @@ pub fn sys_waittid(tid: usize) -> i32 {
         process_inner.tasks[tid] = None;
         exit_code
     } else {
+        // if process_inner.is_deadlock_detect_enabled() {
+        //     process_inner
+        //         .wait_deadlock_block
+        //         .append_resource_available(0);
+        // }
         // waited thread has not exited
         -2
     }

@@ -28,6 +28,12 @@ impl MutexSpin {
     }
 }
 
+impl Default for MutexSpin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Mutex for MutexSpin {
     /// Lock the spinlock mutex
     fn lock(&self) {
@@ -74,6 +80,12 @@ impl MutexBlocking {
                 })
             },
         }
+    }
+}
+
+impl Default for MutexBlocking {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

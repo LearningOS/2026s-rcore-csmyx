@@ -23,6 +23,151 @@ pub struct ProcessControlBlock {
     inner: UPSafeCell<ProcessControlBlockInner>,
 }
 
+// /// todo doc
+// pub enum DeadLockResouceDetect {
+//     Mutex(DeadLockBlock),
+//     Sema(DeadLockBlock),
+// }
+
+/// todo doc
+/// https://uobdv.github.io/Design-Verification/Supplementary/System_Deadlocks-Four_necessary_and_sufficient_conditions_for_deadlock.pdf
+#[derive(Default)]
+pub struct DeadLockDetector {
+    /// Available
+    available: Vec<isize>,
+    /// Allocation
+    allocation: Vec<Vec<isize>>,
+    /// Request
+    request: Vec<Vec<isize>>,
+    /// todo doc
+    n_thread: usize,
+    /// todo doc
+    n_resource: usize,
+}
+
+impl DeadLockDetector {
+    /// Init the total count of this type resource in system.
+    pub fn init_resource_available(&mut self, res_type: usize, res_count: isize) {
+        if self.n_resource <= res_type {
+            self.n_resource = res_type + 1;
+        }
+        if self.available.len() <= res_type {
+            self.available.resize(res_type + 1, 0);
+        }
+        self.available[res_type] += res_count;
+    }
+
+    /// Append the total count of this type resource in system (which init a new res_type implicitly).
+    pub fn append_resource_available(&mut self, res_count: isize) {
+        self.available.push(res_count);
+    }
+
+    /// todo doc
+    pub fn do_allocate(&mut self, tid: usize, req_res: Vec<(usize, isize)>) {
+        if self.n_thread <= tid {
+            self.n_thread = tid + 1;
+        }
+        for (res_type, res_count) in req_res {
+            if self.allocation.len() <= tid {
+                self.allocation.resize(tid + 1, vec![0; res_type + 1]);
+            }
+            if self.allocation[tid].len() <= res_type {
+                self.allocation[tid].resize(res_type + 1, 0);
+            }
+            self.allocation[tid][res_type] += res_count;
+            self.request[tid][res_type] -= res_count;
+            self.available[res_type] -= res_count;
+        }
+    }
+
+    /// Do allocations for this request, return true if check succeed,
+    /// Otherwise, return false which means dead lock detected.
+    fn check_request_inner(&mut self) -> bool {
+        info!("thread {}, res {}", self.n_thread, self.n_resource);
+        let self_req = &mut self.request;
+        let mut finish = vec![false; self.n_thread];
+        let mut work = self.available.clone();
+        for (tid, allocated) in self.allocation.iter().enumerate() {
+            if allocated.iter().all(|&x| x == 0) {
+                finish[tid] = true;
+                // info!("finish {}", tid);
+            }
+        }
+        info!(
+            "avial: {:?}, allocate: {:?}, req: {:?}",
+            self.available, self.allocation, self_req
+        );
+        loop {
+            let mut changed = false;
+            for (tid, req) in self_req.iter().enumerate() {
+                if finish[tid] {
+                    continue;
+                }
+                if work.iter().zip(req.iter()).all(|(&a, &b)| a >= b) {
+                    if let Some(allocated) = self.allocation.get(tid) {
+                        work.iter_mut()
+                            .zip(allocated.iter())
+                            .for_each(|(a, b)| *a += b);
+                    }
+                    info!("finish {}, work now is {:?}", tid, work);
+                    finish[tid] = true;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        // info!(
+        //     "available: {:?}, allocate: {:?}, req: {:?}",
+        //     self.available, self.allocation, self.request
+        // );
+        finish.iter().all(|&x| x)
+    }
+
+    /// Do allocations for this thread's request, return true if check succeed,
+    /// Otherwise, return false which means dead lock detected.
+    pub fn check_request(&mut self, tid: usize, req_res: Vec<(usize, isize)>) -> bool {
+        if self.n_thread <= tid {
+            self.n_thread = tid + 1;
+        }
+        info!("T{},R{}", self.n_thread, self.n_resource);
+        if tid >= self.request.len() {
+            self.request.resize(tid + 1, vec![0; self.n_resource]);
+        }
+        for &(res_type, res_count) in &req_res {
+            assert!(res_type < self.n_resource);
+            if self.request[tid].len() < self.n_resource {
+                self.request[tid].resize(self.n_resource, 0);
+            }
+            self.request[tid][res_type] += res_count;
+        }
+        info!("check {:?}", self.request);
+        if !self.check_request_inner() {
+            for &(res_type, res_count) in &req_res {
+                self.request[tid][res_type] -= res_count;
+            }
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Release the `res_type` resource of thead tid by `res_count`.
+    pub fn release_resource_of_tid(&mut self, tid: usize, res_type: usize, res_count: isize) {
+        assert!(self.allocation[tid][res_type] >= res_count);
+        self.allocation[tid][res_type] -= res_count;
+        self.available[res_type] += res_count;
+    }
+    /// Release all resources of thead tid.
+    pub fn release_all_resources_of_tid(&mut self, tid: usize) {
+        self.available
+            .iter_mut()
+            .zip(self.allocation[tid].iter())
+            .for_each(|(a, b)| *a += b);
+    }
+}
+
 /// Inner of Process Control Block
 pub struct ProcessControlBlockInner {
     /// is zombie?
@@ -49,6 +194,13 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    /// deadlock_detect flag
+    pub deadlock_detect_enabled: bool,
+    /// todo doc
+    pub mutex_deadlock_block: DeadLockDetector,
+    /// todo doc
+    pub sema_deadlock_block: DeadLockDetector,
+    // pub wait_deadlock_block: DeadLockDetector,
 }
 
 impl ProcessControlBlockInner {
@@ -81,6 +233,15 @@ impl ProcessControlBlockInner {
     /// get a task with tid in this process
     pub fn get_task(&self, tid: usize) -> Arc<TaskControlBlock> {
         self.tasks[tid].as_ref().unwrap().clone()
+    }
+    /// switch deadlock detect
+    pub fn switch_deadlock_detect(&mut self, flag: bool) -> bool {
+        self.deadlock_detect_enabled = flag;
+        true
+    }
+    /// check deadlock detect
+    pub fn is_deadlock_detect_enabled(&self) -> bool {
+        self.deadlock_detect_enabled
     }
 }
 
@@ -119,6 +280,11 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    deadlock_detect_enabled: false,
+                    // mutex_deadlock_block: DeadLockResouceDetect::Mutex(DeadLockBlock::default()),
+                    // sema_deadlock_block: DeadLockResouceDetect::Sema(DeadLockBlock::default()),
+                    mutex_deadlock_block: DeadLockDetector::default(),
+                    sema_deadlock_block: DeadLockDetector::default(),
                 })
             },
         });
@@ -245,6 +411,9 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    deadlock_detect_enabled: false,
+                    mutex_deadlock_block: DeadLockDetector::default(),
+                    sema_deadlock_block: DeadLockDetector::default(),
                 })
             },
         });

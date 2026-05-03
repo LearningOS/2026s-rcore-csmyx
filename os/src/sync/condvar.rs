@@ -46,3 +46,9 @@ impl Condvar {
         mutex.lock();
     }
 }
+
+impl Default for Condvar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
